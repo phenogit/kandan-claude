@@ -22,6 +22,7 @@ const newClient = new MongoClient(process.env.MONGODB_URI_NEW, {
 
 let legacyDb: Db | null = null;
 let newDb: Db | null = null;
+let connectionPromise: Promise<{ legacyDb: Db; newDb: Db }> | null = null;
 
 export async function connectDatabases() {
   try {
@@ -44,10 +45,18 @@ export async function connectDatabases() {
   }
 }
 
+// Ensure connection is established (singleton pattern)
+export function ensureConnected() {
+  if (!connectionPromise) {
+    connectionPromise = connectDatabases();
+  }
+  return connectionPromise;
+}
+
 export function getLegacyDb(): Db {
   if (!legacyDb) {
     throw new Error(
-      "Legacy database not connected. Call connectDatabases() first."
+      "Legacy database not connected. Call ensureConnected() first."
     );
   }
   return legacyDb;
@@ -56,7 +65,7 @@ export function getLegacyDb(): Db {
 export function getNewDb(): Db {
   if (!newDb) {
     throw new Error(
-      "New database not connected. Call connectDatabases() first."
+      "New database not connected. Call ensureConnected() first."
     );
   }
   return newDb;
@@ -66,10 +75,12 @@ export function getNewDb(): Db {
 export const legacyDB = {
   users: {
     async findOne(query: any) {
+      await ensureConnected();
       const db = getLegacyDb();
       return db.collection("users").findOne(query);
     },
     async find(query: any, options?: any) {
+      await ensureConnected();
       const db = getLegacyDb();
       return db.collection("users").find(query, options).toArray();
     },
@@ -78,14 +89,17 @@ export const legacyDB = {
 
   predictions: {
     async findOne(query: any) {
+      await ensureConnected();
       const db = getLegacyDb();
       return db.collection("predictions").findOne(query);
     },
     async find(query: any, options?: any) {
+      await ensureConnected();
       const db = getLegacyDb();
       return db.collection("predictions").find(query, options).toArray();
     },
     async count(query: any) {
+      await ensureConnected();
       const db = getLegacyDb();
       return db.collection("predictions").countDocuments(query);
     },
@@ -97,18 +111,22 @@ export const legacyDB = {
 export const newDB = {
   users: {
     async findOne(query: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("users").findOne(query);
     },
     async insertOne(doc: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("users").insertOne(doc);
     },
     async updateOne(query: any, update: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("users").updateOne(query, update);
     },
     async deleteOne(query: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("users").deleteOne(query);
     },
@@ -116,26 +134,32 @@ export const newDB = {
 
   predictions: {
     async findOne(query: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("predictions").findOne(query);
     },
     async find(query: any, options?: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("predictions").find(query, options).toArray();
     },
     async insertOne(doc: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("predictions").insertOne(doc);
     },
     async updateOne(query: any, update: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("predictions").updateOne(query, update);
     },
     async deleteOne(query: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("predictions").deleteOne(query);
     },
     async countDocuments(query: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("predictions").countDocuments(query);
     },
@@ -143,22 +167,27 @@ export const newDB = {
 
   subscriptions: {
     async findOne(query: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("subscriptions").findOne(query);
     },
     async find(query: any, options?: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("subscriptions").find(query, options).toArray();
     },
     async insertOne(doc: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("subscriptions").insertOne(doc);
     },
     async deleteOne(query: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("subscriptions").deleteOne(query);
     },
     async countDocuments(query: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("subscriptions").countDocuments(query);
     },
@@ -166,10 +195,12 @@ export const newDB = {
 
   userStats: {
     async findOne(query: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("user_stats").findOne(query);
     },
     async updateOne(query: any, update: any, options?: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("user_stats").updateOne(query, update, options);
     },
@@ -177,14 +208,17 @@ export const newDB = {
 
   notifications: {
     async find(query: any, options?: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("notifications").find(query, options).toArray();
     },
     async insertOne(doc: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("notifications").insertOne(doc);
     },
     async updateOne(query: any, update: any) {
+      await ensureConnected();
       const db = getNewDb();
       return db.collection("notifications").updateOne(query, update);
     },
@@ -192,4 +226,4 @@ export const newDB = {
 };
 
 // Initialize database connection on module load
-connectDatabases().catch(console.error);
+ensureConnected().catch(console.error);
