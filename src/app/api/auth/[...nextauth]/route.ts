@@ -196,5 +196,11 @@ async function generateUniqueUsername(baseName: string): Promise<string> {
   return username;
 }
 
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+// At the very bottom, replace everything after authOptions with:
+
+// Export the handlers directly
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
+
+// Export GET and POST
+export const GET = handlers.GET;
+export const POST = handlers.POST;
