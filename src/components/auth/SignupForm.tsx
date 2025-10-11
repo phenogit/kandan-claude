@@ -3,10 +3,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
 export default function SignupForm() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -14,25 +15,55 @@ export default function SignupForm() {
     confirmPassword: '',
     displayName: '',
   });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+    // Clear error when user types
+    if (error) setError('');
+  };
+
+  const validateForm = () => {
+    // Username validation: 3-30 chars, alphanumeric + underscore
+    const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
+    if (!usernameRegex.test(formData.username)) {
+      setError('使用者名稱必須為 3-30 個字元，只能包含英數字和底線');
+      return false;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('請輸入有效的電子郵件地址');
+      return false;
+    }
+
+    // Password validation: min 8 chars
+    if (formData.password.length < 8) {
+      setError('密碼必須至少 8 個字元');
+      return false;
+    }
+
+    // Password match
+    if (formData.password !== formData.confirmPassword) {
+      setError('密碼確認不符');
+      return false;
+    }
+
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsLoading(true);
     setError('');
-
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('密碼不一致');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError('密碼必須至少 8 個字元');
-      return;
-    }
-
-    setLoading(true);
 
     try {
       const response = await fetch('/api/auth/signup', {
@@ -48,148 +79,156 @@ export default function SignupForm() {
 
       const data = await response.json();
 
-      if (data.success) {
-        // Show success message and redirect to login
-        alert('註冊成功！請登入');
-        router.push('/login');
-      } else {
-        setError(data.error || '註冊失敗');
+      if (!response.ok) {
+        throw new Error(data.error || '註冊失敗');
       }
+
+      console.log('✅ Signup successful:', data); // Debug log
+
+      // Success! Redirect to verification page
+      const emailToVerify = data.data?.email || formData.email;
+      const verifyUrl = '/verify-email?email=' + encodeURIComponent(emailToVerify);
+      console.log('🔄 Redirecting to:', verifyUrl); // Debug log
+      
+      // Force redirect
+      window.location.href = verifyUrl;
     } catch (err) {
-      setError('註冊失敗，請稍後再試');
+      setError(err instanceof Error ? err.message : '註冊時發生錯誤，請稍後再試');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Error Message */}
+      {error && (
+        <div className="rounded-md bg-red-50 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-red-800">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Username */}
       <div>
-        <label htmlFor="username" className="block text-sm font-medium text-text-primary mb-2">
-          使用者名稱 *
+        <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+          使用者名稱 <span className="text-red-500">*</span>
         </label>
         <input
           id="username"
+          name="username"
           type="text"
           required
           value={formData.username}
-          onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-          className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-          placeholder="username"
-          disabled={loading}
-          minLength={3}
-          maxLength={30}
-          pattern="[a-zA-Z0-9_]+"
-          title="只能包含字母、數字和底線"
+          onChange={handleChange}
+          placeholder="username123"
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
-        <p className="text-xs text-text-secondary mt-1">
-          3-30 個字元，只能使用字母、數字和底線
+        <p className="mt-1 text-xs text-gray-500">
+          3-30 個字元，只能包含英數字和底線
+        </p>
+      </div>
+
+      {/* Display Name */}
+      <div>
+        <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
+          顯示名稱（選填）
+        </label>
+        <input
+          id="displayName"
+          name="displayName"
+          type="text"
+          value={formData.displayName}
+          onChange={handleChange}
+          placeholder="張小明"
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          未填寫時將使用使用者名稱
         </p>
       </div>
 
       {/* Email */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-2">
-          電子郵件 *
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+          電子郵件 <span className="text-red-500">*</span>
         </label>
         <input
           id="email"
+          name="email"
           type="email"
           required
           value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          onChange={handleChange}
           placeholder="your@email.com"
-          disabled={loading}
-        />
-      </div>
-
-      {/* Display Name (Optional) */}
-      <div>
-        <label htmlFor="displayName" className="block text-sm font-medium text-text-primary mb-2">
-          顯示名稱 <span className="text-text-secondary">(可選)</span>
-        </label>
-        <input
-          id="displayName"
-          type="text"
-          value={formData.displayName}
-          onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-          className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-          placeholder="您的顯示名稱"
-          disabled={loading}
-          maxLength={100}
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
       {/* Password */}
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-text-primary mb-2">
-          密碼 *
+        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+          密碼 <span className="text-red-500">*</span>
         </label>
         <input
           id="password"
+          name="password"
           type="password"
           required
           value={formData.password}
-          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          onChange={handleChange}
           placeholder="••••••••"
-          disabled={loading}
-          minLength={8}
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
-        <p className="text-xs text-text-secondary mt-1">
+        <p className="mt-1 text-xs text-gray-500">
           至少 8 個字元
         </p>
       </div>
 
       {/* Confirm Password */}
       <div>
-        <label htmlFor="confirmPassword" className="block text-sm font-medium text-text-primary mb-2">
-          確認密碼 *
+        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+          確認密碼 <span className="text-red-500">*</span>
         </label>
         <input
           id="confirmPassword"
+          name="confirmPassword"
           type="password"
           required
           value={formData.confirmPassword}
-          onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-          className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          onChange={handleChange}
           placeholder="••••••••"
-          disabled={loading}
-          minLength={8}
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="p-3 bg-fail/10 border border-fail/20 rounded-lg">
-          <p className="text-sm text-fail">{error}</p>
-        </div>
-      )}
 
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={loading}
-        className="w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isLoading}
+        className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            註冊中...
-          </span>
-        ) : (
-          '註冊'
-        )}
+        {isLoading ? '註冊中...' : '建立帳號'}
       </button>
 
-      {/* Login Link */}
-      <p className="text-center text-sm text-text-secondary">
-        已經有帳號？
-        <Link href="/login" className="text-primary font-medium hover:underline ml-1">
-          登入
-        </Link>
+      {/* Terms */}
+      <p className="text-xs text-center text-gray-500">
+        註冊即表示您同意我們的{' '}
+        <a href="/terms" className="text-blue-600 hover:text-blue-500">
+          服務條款
+        </a>{' '}
+        和{' '}
+        <a href="/privacy" className="text-blue-600 hover:text-blue-500">
+          隱私政策
+        </a>
       </p>
     </form>
   );
