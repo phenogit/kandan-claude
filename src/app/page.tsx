@@ -1,103 +1,122 @@
-import Image from "next/image";
+// src/app/page.tsx
+import Link from 'next/link';
+import MostPredictedStocks from '@/components/home/MostPredictedStocks';
+import MostFollowedPredictions from '@/components/home/MostFollowedPredictions';
+import MostSuccessfulUsers from '@/components/home/MostSuccessfulUsers';
+import GlobalFeed from '@/components/home/GlobalFeed';
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <Link href="/" className="flex items-center">
+              <span className="text-2xl font-bold text-blue-600">
+                股票預測平台
+              </span>
+            </Link>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            {/* Right side actions */}
+            <div className="flex items-center gap-4">
+              {/* Notifications (placeholder) */}
+              <button className="relative p-2 text-gray-400 hover:text-gray-500">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {/* Badge */}
+                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+              </button>
+
+              {/* Auth buttons */}
+              <Link
+                href="/login"
+                className="text-gray-700 hover:text-gray-900 font-medium"
+              >
+                登入
+              </Link>
+              <Link
+                href="/signup"
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium"
+              >
+                註冊
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Mobile Tabs */}
+        <div className="lg:hidden mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex gap-8">
+              <button className="border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600">
+                動態
+              </button>
+              <button className="border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                統計
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Desktop: Three Column Layout */}
+        <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+          {/* Left Sidebar - Desktop only */}
+          <aside className="hidden lg:block lg:col-span-3">
+            <div className="sticky top-8 space-y-6">
+              <MostPredictedStocks />
+            </div>
+          </aside>
+
+          {/* Main Feed */}
+          <div className="lg:col-span-6 space-y-8">
+            {/* Mobile: Most Predicted Stocks */}
+            <div className="lg:hidden">
+              <MostPredictedStocks />
+            </div>
+
+            {/* Most Followed Predictions */}
+            <MostFollowedPredictions />
+
+            {/* Most Successful Users */}
+            <MostSuccessfulUsers />
+
+            {/* Global Feed */}
+            <GlobalFeed />
+          </div>
+
+          {/* Right Sidebar - Desktop only */}
+          <aside className="hidden lg:block lg:col-span-3">
+            <div className="sticky top-8 space-y-6">
+              {/* Quick Stats */}
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  平台統計
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">總預測</span>
+                    <span className="text-sm font-semibold text-gray-900">38,393</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">活躍用戶</span>
+                    <span className="text-sm font-semibold text-gray-900">2,450</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">平台準確率</span>
+                    <span className="text-sm font-semibold text-green-600">62.5%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
