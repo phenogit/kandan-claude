@@ -7,9 +7,8 @@ type Stock = {
   ticker: string;
   name: string;
   predictionCount: number;
-  majorityDirection: number; // 1 = bull, -1 = bear
-  bullCount: number;
-  bearCount: number;
+  ongoingCount: number;
+  resolvedCount: number;
 };
 
 export default function MostPredictedStocks() {
@@ -43,9 +42,10 @@ export default function MostPredictedStocks() {
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="animate-pulse flex items-center gap-3">
-              <div className="h-8 w-8 bg-gray-200 rounded"></div>
+              <div className="h-4 w-6 bg-gray-200 rounded"></div>
               <div className="flex-1">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
               </div>
             </div>
           ))}
@@ -72,32 +72,14 @@ export default function MostPredictedStocks() {
               </span>
             </div>
 
-            {/* Bull/Bear Indicator */}
-            <div className="flex-shrink-0">
-              {stock.majorityDirection === 1 ? (
-                <span className="text-2xl" title="看漲">🐂</span>
-              ) : (
-                <span className="text-2xl" title="看跌">🐻</span>
-              )}
-            </div>
-
             {/* Stock Info */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 truncate">
                 {stock.ticker} {stock.name}
               </p>
               <p className="text-xs text-gray-500">
-                {stock.predictionCount} 個預測
+                {stock.predictionCount} 個預測 · {stock.ongoingCount} 進行中 · {stock.resolvedCount} 已結束
               </p>
-            </div>
-
-            {/* Direction Split */}
-            <div className="flex-shrink-0 text-right">
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-red-600">↑{stock.bullCount}</span>
-                <span className="text-gray-400">/</span>
-                <span className="text-green-600">↓{stock.bearCount}</span>
-              </div>
             </div>
           </div>
         ))}

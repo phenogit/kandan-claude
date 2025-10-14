@@ -20,12 +20,12 @@ export async function GET() {
           _id: "$stockId",
           stockName: { $first: "$stockName" },
           count: { $sum: 1 },
-          // Calculate bull vs bear majority
-          bullCount: {
-            $sum: { $cond: [{ $eq: ["$bearOrBull", 1] }, 1, 0] },
+          // Count ongoing vs resolved
+          ongoingCount: {
+            $sum: { $cond: [{ $eq: ["$isCompleted", false] }, 1, 0] },
           },
-          bearCount: {
-            $sum: { $cond: [{ $eq: ["$bearOrBull", -1] }, 1, 0] },
+          resolvedCount: {
+            $sum: { $cond: [{ $eq: ["$isCompleted", true] }, 1, 0] },
           },
         },
       },
@@ -39,16 +39,8 @@ export async function GET() {
           ticker: "$_id",
           name: "$stockName",
           predictionCount: "$count",
-          // Majority direction: bull (1) or bear (-1)
-          majorityDirection: {
-            $cond: [
-              { $gte: ["$bullCount", "$bearCount"] },
-              1, // Bull majority
-              -1, // Bear majority
-            ],
-          },
-          bullCount: 1,
-          bearCount: 1,
+          ongoingCount: 1,
+          resolvedCount: 1,
         },
       },
     ]);
