@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ["mongodb"],
+  webpack: (config) => {
+    config.externals = [...(config.externals || []), "mongodb"];
+    return config;
+  },
 };
 
 export default nextConfig;
