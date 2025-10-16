@@ -78,6 +78,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID!,
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: "public_profile email", // Explicitly request email permission
+        },
+      },
     }),
 
     // Apple OAuth Provider
