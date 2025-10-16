@@ -1,11 +1,15 @@
 // src/app/page.tsx
 import Link from 'next/link';
+import { auth } from '@/lib/auth';
 import MostPredictedStocks from '@/components/home/MostPredictedStocks';
 import MostFollowedPredictions from '@/components/home/MostFollowedPredictions';
 import MostSuccessfulUsers from '@/components/home/MostSuccessfulUsers';
 import GlobalFeed from '@/components/home/GlobalFeed';
+import UserMenu from '@/components/header/UserMenu';
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth();
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -22,27 +26,35 @@ export default function HomePage() {
             {/* Right side actions */}
             <div className="flex items-center gap-4">
               {/* Notifications (placeholder) */}
-              <button className="relative p-2 text-gray-400 hover:text-gray-500">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                {/* Badge */}
-                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-              </button>
+              {session && (
+                <button className="relative p-2 text-gray-400 hover:text-gray-500">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {/* Badge */}
+                  <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+                </button>
+              )}
 
-              {/* Auth buttons */}
-              <Link
-                href="/login"
-                className="text-gray-700 hover:text-gray-900 font-medium"
-              >
-                登入
-              </Link>
-              <Link
-                href="/signup"
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium"
-              >
-                註冊
-              </Link>
+              {/* Auth buttons or User menu */}
+              {session ? (
+                <UserMenu user={session.user} />
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="text-gray-700 hover:text-gray-900 font-medium"
+                  >
+                    登入
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium"
+                  >
+                    註冊
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
