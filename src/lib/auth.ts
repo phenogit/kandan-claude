@@ -85,11 +85,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
 
-    // Apple OAuth Provider
-    AppleProvider({
-      clientId: process.env.APPLE_ID!,
-      clientSecret: process.env.APPLE_SECRET!,
-    }),
+    // TODO: Enable Apple OAuth when deploying to production with real domain
+    // AppleProvider({
+    //   clientId: process.env.APPLE_ID!,
+    //   clientSecret: process.env.APPLE_SECRET!,
+    // }),
   ],
 
   callbacks: {
