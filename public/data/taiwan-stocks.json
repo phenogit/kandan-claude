@@ -1,0 +1,107 @@
+[
+    {
+      "ticker": "2330",
+      "name": "台積電",
+      "nameEn": "Taiwan Semiconductor Manufacturing",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "2317",
+      "name": "鴻海",
+      "nameEn": "Hon Hai Precision Industry",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "2454",
+      "name": "聯發科",
+      "nameEn": "MediaTek Inc",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "2308",
+      "name": "台達電",
+      "nameEn": "Delta Electronics",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "2412",
+      "name": "中華電",
+      "nameEn": "Chunghwa Telecom",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "2881",
+      "name": "富邦金",
+      "nameEn": "Fubon Financial Holding",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "2882",
+      "name": "國泰金",
+      "nameEn": "Cathay Financial Holding",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "2886",
+      "name": "兆豐金",
+      "nameEn": "Mega Financial Holding",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "0050",
+      "name": "元大台灣50",
+      "nameEn": "Yuanta Taiwan 50 ETF",
+      "market": "twse",
+      "type": "etf"
+    },
+    {
+      "ticker": "0056",
+      "name": "元大高股息",
+      "nameEn": "Yuanta Taiwan Dividend Plus ETF",
+      "market": "twse",
+      "type": "etf"
+    },
+    {
+      "ticker": "3008",
+      "name": "大立光",
+      "nameEn": "Largan Precision",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "2303",
+      "name": "聯電",
+      "nameEn": "United Microelectronics",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "1301",
+      "name": "台塑",
+      "nameEn": "Formosa Plastics",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "1303",
+      "name": "南亞",
+      "nameEn": "Nan Ya Plastics",
+      "market": "twse",
+      "type": "stock"
+    },
+    {
+      "ticker": "2002",
+      "name": "中鋼",
+      "nameEn": "China Steel",
+      "market": "twse",
+      "type": "stock"
+    }
+  ]
