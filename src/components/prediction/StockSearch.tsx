@@ -27,6 +27,7 @@ export default function StockSearch({ onSelect, error }: Props) {
   const [results, setResults] = useState<Stock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [hasSelected, setHasSelected] = useState(false); // Track if stock was selected
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +36,12 @@ export default function StockSearch({ onSelect, error }: Props) {
     if (query.length < 1) {
       setResults([]);
       setShowDropdown(false);
+      setHasSelected(false);
+      return;
+    }
+
+    // Don't search if a stock was just selected
+    if (hasSelected) {
       return;
     }
 
@@ -56,7 +63,7 @@ export default function StockSearch({ onSelect, error }: Props) {
 
     const debounce = setTimeout(searchStocks, 300);
     return () => clearTimeout(debounce);
-  }, [query]);
+  }, [query, hasSelected]);
 
   // Click outside to close dropdown
   useEffect(() => {
@@ -78,6 +85,8 @@ export default function StockSearch({ onSelect, error }: Props) {
   const handleSelectStock = async (stock: Stock) => {
     setQuery(`${stock.ticker} - ${stock.name}`);
     setShowDropdown(false);
+    setResults([]);
+    setHasSelected(true); // Mark as selected
 
     // Fetch current price
     try {
@@ -112,7 +121,7 @@ export default function StockSearch({ onSelect, error }: Props) {
           placeholder="輸入股票代碼或名稱 (例: 2330 或台積電)"
           className={`w-full px-4 py-3 pr-10 border ${
             error ? 'border-red-500' : 'border-gray-300'
-          } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+          } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500`}
         />
         {isLoading && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -157,7 +166,7 @@ export default function StockSearch({ onSelect, error }: Props) {
                     {stock.ticker} - {stock.name}
                   </div>
                   {stock.nameEn && (
-                    <div className="text-sm text-gray-500">{stock.nameEn}</div>
+                    <div className="text-sm text-gray-600">{stock.nameEn}</div>
                   )}
                 </div>
                 {stock.market && (
@@ -171,7 +180,7 @@ export default function StockSearch({ onSelect, error }: Props) {
         </div>
       )}
 
-      {showDropdown && results.length === 0 && query && !isLoading && (
+      {showDropdown && results.length === 0 && query && !isLoading && !hasSelected && (
         <div className="absolute z-20 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500">
           找不到股票，請嘗試其他關鍵字
         </div>

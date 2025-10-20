@@ -1,24 +1,15 @@
-// ============================================
 // src/app/api/predictions/route.ts
-// ============================================
-
-import {
-  NextRequest as PredictionsRequest,
-  NextResponse as PredictionsResponse,
-} from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { connectDatabases } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function POST(request: PredictionsRequest) {
+export async function POST(request: NextRequest) {
   try {
     // Check authentication
     const session = await auth();
     if (!session || !session.user) {
-      return PredictionsResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -37,39 +28,36 @@ export async function POST(request: PredictionsRequest) {
 
     // Validation
     if (!ticker || !tickerName) {
-      return PredictionsResponse.json({ error: "請選擇股票" }, { status: 400 });
+      return NextResponse.json({ error: "請選擇股票" }, { status: 400 });
     }
 
     if (direction !== 1 && direction !== -1) {
-      return PredictionsResponse.json(
-        { error: "請選擇預測方向" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "請選擇預測方向" }, { status: 400 });
     }
 
     if (!ceiling || !floor || !startPrice) {
-      return PredictionsResponse.json(
+      return NextResponse.json(
         { error: "請輸入完整的價格資訊" },
         { status: 400 }
       );
     }
 
     if (ceiling <= floor) {
-      return PredictionsResponse.json(
+      return NextResponse.json(
         { error: "天花板必須高於地板" },
         { status: 400 }
       );
     }
 
     if (ceiling <= startPrice || floor >= startPrice) {
-      return PredictionsResponse.json(
+      return NextResponse.json(
         { error: "價格區間必須包含現價" },
         { status: 400 }
       );
     }
 
     if (confidence < 1 || confidence > 5) {
-      return PredictionsResponse.json(
+      return NextResponse.json(
         { error: "信心指數必須在 1-5 之間" },
         { status: 400 }
       );
@@ -84,10 +72,7 @@ export async function POST(request: PredictionsRequest) {
     });
 
     if (!user) {
-      return PredictionsResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Create prediction document
@@ -116,21 +101,21 @@ export async function POST(request: PredictionsRequest) {
 
     const result = await newDb.collection("predictions").insertOne(prediction);
 
-    return PredictionsResponse.json({
+    return NextResponse.json({
       success: true,
       predictionId: result.insertedId.toString(),
       message: "預測創建成功",
     });
   } catch (error) {
     console.error("Create prediction error:", error);
-    return PredictionsResponse.json(
+    return NextResponse.json(
       { error: "Failed to create prediction" },
       { status: 500 }
     );
   }
 }
 
-export async function GET(request: PredictionsRequest) {
+export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const ticker = searchParams.get("ticker");
@@ -185,7 +170,7 @@ export async function GET(request: PredictionsRequest) {
       };
     });
 
-    return PredictionsResponse.json({
+    return NextResponse.json({
       predictions: enrichedPredictions,
       pagination: {
         page,
@@ -196,7 +181,7 @@ export async function GET(request: PredictionsRequest) {
     });
   } catch (error) {
     console.error("Get predictions error:", error);
-    return PredictionsResponse.json(
+    return NextResponse.json(
       { error: "Failed to get predictions" },
       { status: 500 }
     );

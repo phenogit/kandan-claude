@@ -163,7 +163,7 @@ export default function CreatePredictionPage() {
       <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         {/* Stock Search */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
             選擇股票 <span className="text-red-500">*</span>
           </label>
           <StockSearch
@@ -194,7 +194,7 @@ export default function CreatePredictionPage() {
 
         {/* Direction */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
             預測方向 <span className="text-red-500">*</span>
           </label>
           <DirectionSelector
@@ -215,7 +215,7 @@ export default function CreatePredictionPage() {
 
         {/* Confidence */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
             信心指數 <span className="text-red-500">*</span>
           </label>
           <ConfidenceSelector
@@ -226,7 +226,7 @@ export default function CreatePredictionPage() {
 
         {/* Rationale */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
             預測理由 <span className="text-gray-400">(選填)</span>
           </label>
           <textarea
@@ -235,7 +235,7 @@ export default function CreatePredictionPage() {
             placeholder="分享你的分析和理由..."
             rows={4}
             maxLength={1000}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none placeholder-gray-500"
           />
           <div className="mt-1 text-sm text-gray-500 text-right">
             {rationale.length} / 1000

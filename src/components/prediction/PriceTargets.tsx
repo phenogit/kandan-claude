@@ -24,11 +24,11 @@ export default function PriceTargets({
     <div className="space-y-4">
       {/* Ceiling */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-900 mb-2">
           天花板價格 <span className="text-red-500">*</span>
         </label>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">
+          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600">
             $
           </span>
           <input
@@ -39,7 +39,7 @@ export default function PriceTargets({
             placeholder="目標上限"
             className={`w-full pl-8 pr-4 py-3 border ${
               errors?.ceiling ? 'border-red-500' : 'border-gray-300'
-            } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+            } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500`}
           />
         </div>
         {errors?.ceiling && (
