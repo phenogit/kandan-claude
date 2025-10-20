@@ -6,12 +6,14 @@ export const metadata = {
   description: '請檢查您的電子郵件以完成註冊',
 };
 
-export default function VerifyEmailPage({
+export default async function VerifyEmailPage({
   searchParams,
 }: {
-  searchParams: { email?: string };
+  searchParams: Promise<{ email?: string }>;
 }) {
-  const email = searchParams.email;
+  // Await searchParams in Next.js 15
+  const params = await searchParams;
+  const email = params.email;
 
   return (
     <div className="w-full max-w-md space-y-8 text-center">
