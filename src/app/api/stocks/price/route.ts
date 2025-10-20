@@ -1,39 +1,41 @@
-// ============================================
 // src/app/api/stocks/price/route.ts
-// ============================================
+import { NextRequest, NextResponse } from "next/server";
+import { fetchStockPrice } from "@/lib/priceService";
 
-import {
-  NextRequest as PriceRequest,
-  NextResponse as PriceResponse,
-} from "next/server";
-
-export async function GET(request: PriceRequest) {
+export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const ticker = searchParams.get("ticker");
 
     if (!ticker) {
-      return PriceResponse.json(
+      return NextResponse.json(
         { error: "Ticker is required" },
         { status: 400 }
       );
     }
 
-    // TODO: Implement actual price fetching from Yahoo Taiwan or Finnhub
-    // For now, return mock data for development
-    const mockPrice = {
-      ticker,
-      price: 580.0 + Math.random() * 20, // Mock current price
-      dailyHigh: 595.0,
-      dailyLow: 575.0,
-      timestamp: new Date().toISOString(),
-    };
+    // Fetch real price from Yahoo Taiwan or Finnhub
+    try {
+      const priceData = await fetchStockPrice(ticker);
 
-    return PriceResponse.json(mockPrice);
+      return NextResponse.json(priceData);
+    } catch (priceError) {
+      // If both sources fail, return error
+      console.error("Price fetch error:", priceError);
+
+      return NextResponse.json(
+        {
+          error: "Failed to fetch stock price",
+          details:
+            priceError instanceof Error ? priceError.message : "Unknown error",
+        },
+        { status: 503 } // Service Unavailable
+      );
+    }
   } catch (error) {
-    console.error("Price fetch error:", error);
-    return PriceResponse.json(
-      { error: "Failed to fetch price" },
+    console.error("API error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
