@@ -101,6 +101,20 @@ export async function POST(request: NextRequest) {
 
     const result = await newDb.collection("predictions").insertOne(prediction);
 
+    // Update user statistics
+    await newDb.collection("userStats").updateOne(
+      { userId: user._id },
+      {
+        $inc: {
+          totalPredictions: 1,
+          pendingPredictions: 1,
+          originalPredictions: 1, // or followedPredictions if followed
+        },
+        $set: { updatedAt: new Date() },
+      },
+      { upsert: true } // Creates userStats if doesn't exist
+    );
+
     return NextResponse.json({
       success: true,
       predictionId: result.insertedId.toString(),
