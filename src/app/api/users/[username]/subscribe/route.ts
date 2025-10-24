@@ -1,4 +1,4 @@
-// src/app/api/users/[userId]/subscribe/route.ts
+// src/app/api/users/[username]/subscribe/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectDatabases } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  { params }: { params: Promise<{ username: string }> }
 ) {
   try {
     // Check authentication
@@ -18,21 +18,12 @@ export async function POST(
       );
     }
 
-    const { userId } = await params;
+    const { username } = await params;
     const subscriberId = session.user.id;
 
-    // Validate userId
-    if (!ObjectId.isValid(userId)) {
+    if (!username) {
       return NextResponse.json(
-        { success: false, error: "Invalid user ID" },
-        { status: 400 }
-      );
-    }
-
-    // Cannot subscribe to yourself
-    if (userId === subscriberId) {
-      return NextResponse.json(
-        { success: false, error: "Cannot subscribe to yourself" },
+        { success: false, error: "Username is required" },
         { status: 400 }
       );
     }
@@ -52,9 +43,9 @@ export async function POST(
 
     const { newDb } = await connectDatabases();
 
-    // Check if target user exists and is not legacy
+    // Look up target user by username (only new users, not legacy)
     const targetUser = await newDb.collection("users").findOne({
-      _id: new ObjectId(userId),
+      username: username,
     });
 
     if (!targetUser) {
@@ -68,8 +59,18 @@ export async function POST(
       );
     }
 
+    const userId = targetUser._id.toString();
+
+    // Cannot subscribe to yourself
+    if (userId === subscriberId) {
+      return NextResponse.json(
+        { success: false, error: "Cannot subscribe to yourself" },
+        { status: 400 }
+      );
+    }
+
     const subscriberObjectId = new ObjectId(subscriberId);
-    const subscribedToObjectId = new ObjectId(userId);
+    const subscribedToObjectId = targetUser._id;
 
     if (action === "subscribe") {
       // Check if already subscribed
@@ -98,24 +99,26 @@ export async function POST(
         .collection("userStats")
         .updateOne(
           { userId: subscribedToObjectId },
-          { $inc: { subscriberCount: 1 } }
+          { $inc: { subscriberCount: 1 } },
+          { upsert: true }
         );
 
       await newDb
         .collection("userStats")
         .updateOne(
           { userId: subscriberObjectId },
-          { $inc: { subscribedToCount: 1 } }
+          { $inc: { subscribedToCount: 1 } },
+          { upsert: true }
         );
 
-      // TODO: Create notification for target user
+      // Create notification for target user
       await newDb.collection("notifications").insertOne({
         _id: new ObjectId(),
         userId: subscribedToObjectId,
         type: "new_subscriber",
         data: {
           subscriberId: subscriberId,
-          subscriberUsername: session.user.username,
+          subscriberUsername: session.user.username || session.user.name,
         },
         isRead: false,
         createdAt: new Date(),

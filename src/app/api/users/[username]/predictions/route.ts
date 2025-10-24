@@ -42,8 +42,8 @@ export async function GET(
     let total = 0;
 
     if (isLegacy) {
-      // Fetch legacy predictions
-      const query: any = { userId: user._id };
+      // Fetch legacy predictions - Query by userName, not userId!
+      const query: any = { userName: user.name }; // ✅ FIXED: Use userName for legacy
 
       // Status filter for legacy
       if (status === "pending") {
@@ -57,7 +57,7 @@ export async function GET(
       const legacyPredictions = await legacyDb
         .collection("predictions")
         .find(query)
-        .sort({ created_at: -1 })
+        .sort({ startTime: -1 }) // ✅ FIXED: Use startTime for legacy (not created_at)
         .skip(skip)
         .limit(limit)
         .toArray();
@@ -69,7 +69,7 @@ export async function GET(
         if (typeof currentPrice === "string" && currentPrice.includes("-")) {
           currentPrice = parseFloat(currentPrice.split("-")[0]);
         } else {
-          currentPrice = parseFloat(currentPrice);
+          currentPrice = parseFloat(currentPrice) || 0;
         }
 
         // Determine status
@@ -81,20 +81,20 @@ export async function GET(
         return {
           _id: pred._id.toString(),
           userName: pred.userName || username,
-          ticker: pred.ticker,
-          tickerName: pred.tickerName || pred.ticker,
-          direction: pred.direction,
-          ceiling: pred.ceiling,
-          floor: pred.floor,
-          startPrice: pred.startPrice,
+          ticker: pred.stockId, // ✅ Legacy uses stockId
+          tickerName: pred.stockName, // ✅ Legacy uses stockName
+          direction: pred.bearOrBull, // ✅ Legacy uses bearOrBull
+          ceiling: pred.highPrice, // ✅ Legacy uses highPrice
+          floor: pred.lowPrice, // ✅ Legacy uses lowPrice
+          startPrice: parseFloat(pred.startPrice) || 0,
           currentPrice,
           confidence: pred.confidence || 1,
           status: predStatus,
           profitRate: pred.profitRate || null,
           isLegacy: true,
-          createdAt: pred.created_at,
-          resolvedAt: pred.resolvedAt || pred.updated_at,
-          rationale: pred.rationale || null,
+          createdAt: pred.startTime, // ✅ Legacy uses startTime
+          resolvedAt: pred.endTime || null, // ✅ Legacy uses endTime
+          rationale: null, // Legacy doesn't have rationale
           basedOnPredictionId: null,
         };
       });
