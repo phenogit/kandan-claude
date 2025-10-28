@@ -1,9 +1,11 @@
-// src/app/api/auth/signup/route.ts
+// src/app/api/auth/signup/route.ts - UPDATED WITH EMAIL VERIFICATION
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { ObjectId } from "mongodb";
 import { newDB } from "@/lib/mongodb";
 import { z } from "zod";
+import { generateVerificationToken, sendVerificationEmail } from "@/lib/email";
+import { createVerificationToken } from "@/lib/verification-tokens";
 
 // Validation schema
 const signupSchema = z.object({
@@ -112,17 +114,43 @@ export async function POST(request: NextRequest) {
       { upsert: true }
     );
 
-    // TODO: Send email verification (Phase 1: required)
-    // await sendVerificationEmail(email, verificationToken);
+    // ✅ NEW: Generate verification token
+    const token = generateVerificationToken();
+
+    // ✅ NEW: Store token in database
+    const tokenResult = await createVerificationToken(
+      newUser._id,
+      token,
+      "email_verification"
+    );
+
+    if (!tokenResult.success) {
+      console.error("Failed to create verification token:", tokenResult.error);
+      // Continue anyway - user is created, they can request new token
+    }
+
+    // ✅ NEW: Send verification email
+    const emailResult = await sendVerificationEmail(
+      newUser.email,
+      token,
+      newUser.displayName
+    );
+
+    if (!emailResult.success) {
+      console.error("Failed to send verification email:", emailResult.error);
+      // Continue anyway - user can request resend
+    }
 
     return NextResponse.json({
       success: true,
-      message:
-        "Account created successfully. Please check your email to verify your account.",
+      message: emailResult.success
+        ? "Account created successfully. Please check your email to verify your account."
+        : "Account created successfully. Please request a verification email.",
       data: {
         userId: newUser._id.toString(),
         username: newUser.username,
         email: newUser.email,
+        emailSent: emailResult.success,
       },
     });
   } catch (error) {
