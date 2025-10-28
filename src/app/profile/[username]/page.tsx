@@ -105,7 +105,9 @@ export default function ProfilePage({
   };
 
   const handleEditProfile = () => {
-    router.push('/profile/edit');
+    // TODO: Implement edit profile page
+    alert('編輯功能即將推出！');
+    // router.push('/profile/edit');
   };
 
   // Loading state
