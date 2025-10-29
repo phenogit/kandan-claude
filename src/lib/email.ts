@@ -1,4 +1,4 @@
-// src/lib/email.ts
+// src/lib/email.ts - FIXED VERSION
 import { Resend } from "resend";
 import crypto from "crypto";
 
@@ -27,7 +27,8 @@ export async function sendVerificationEmail(
   username: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const verificationUrl = `${APP_URL}/auth/verify-email?token=${token}`;
+    // ✅ FIXED: Added /api/ prefix to the path
+    const verificationUrl = `${APP_URL}/api/auth/verify-email?token=${token}`;
 
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
@@ -66,7 +67,7 @@ export async function sendVerificationEmail(
             </div>
             
             <div style="text-align: center; color: #999; font-size: 12px;">
-              <p style="margin: 0;">© 2025 股票預測平台. All rights reserved.</p>
+              <p style="margin: 0;">© 2025 股票預測平台. 保留所有權利。</p>
             </div>
           </body>
         </html>
@@ -74,11 +75,11 @@ export async function sendVerificationEmail(
     });
 
     if (error) {
-      console.error("Resend error:", error);
+      console.error("Resend API error:", error);
       return { success: false, error: error.message };
     }
 
-    console.log("Verification email sent:", data);
+    console.log("✅ Verification email sent successfully:", data);
     return { success: true };
   } catch (error) {
     console.error("Error sending verification email:", error);
@@ -90,7 +91,7 @@ export async function sendVerificationEmail(
 }
 
 /**
- * Send password reset email
+ * Send password reset email to user
  */
 export async function sendPasswordResetEmail(
   email: string,
@@ -103,7 +104,7 @@ export async function sendPasswordResetEmail(
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: email,
-      subject: "重設您的密碼 - 股票預測平台",
+      subject: "重設密碼 - 股票預測平台",
       html: `
         <!DOCTYPE html>
         <html>
@@ -114,9 +115,9 @@ export async function sendPasswordResetEmail(
           </head>
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background-color: #f8f9fa; border-radius: 8px; padding: 30px; margin-bottom: 20px;">
-              <h1 style="color: #2563eb; margin: 0 0 20px 0; font-size: 24px;">重設您的密碼</h1>
+              <h1 style="color: #2563eb; margin: 0 0 20px 0; font-size: 24px;">重設密碼</h1>
               <p style="margin: 0 0 10px 0; font-size: 16px;">嗨 <strong>${username}</strong>，</p>
-              <p style="margin: 0 0 20px 0; font-size: 16px;">我們收到了重設您密碼的請求。請點擊下方按鈕重設密碼。</p>
+              <p style="margin: 0 0 20px 0; font-size: 16px;">我們收到了您的重設密碼請求。請點擊下方按鈕重設您的密碼。</p>
               
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${resetUrl}" 
@@ -132,12 +133,12 @@ export async function sendPasswordResetEmail(
               
               <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
                 <p style="margin: 0; font-size: 12px; color: #999;">此連結將在 1 小時後過期。</p>
-                <p style="margin: 10px 0 0 0; font-size: 12px; color: #999;">如果您沒有要求重設密碼，請忽略此郵件，您的密碼不會被變更。</p>
+                <p style="margin: 10px 0 0 0; font-size: 12px; color: #999;">如果您沒有請求重設密碼，請忽略此郵件。</p>
               </div>
             </div>
             
             <div style="text-align: center; color: #999; font-size: 12px;">
-              <p style="margin: 0;">© 2025 股票預測平台. All rights reserved.</p>
+              <p style="margin: 0;">© 2025 股票預測平台. 保留所有權利。</p>
             </div>
           </body>
         </html>
@@ -145,11 +146,11 @@ export async function sendPasswordResetEmail(
     });
 
     if (error) {
-      console.error("Resend error:", error);
+      console.error("Resend API error:", error);
       return { success: false, error: error.message };
     }
 
-    console.log("Password reset email sent:", data);
+    console.log("✅ Password reset email sent successfully:", data);
     return { success: true };
   } catch (error) {
     console.error("Error sending password reset email:", error);
