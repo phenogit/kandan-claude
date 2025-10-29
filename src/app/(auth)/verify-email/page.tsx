@@ -34,7 +34,7 @@ function VerifyEmailContent() {
         setMessage(data.message);
         // Redirect to login after 3 seconds
         setTimeout(() => {
-          router.push('/auth/login?verified=true');
+          router.push('/login?verified=true');
         }, 3000);
       } else {
         setStatus('error');
@@ -120,7 +120,7 @@ function VerifyEmailContent() {
               <p className="text-gray-600 mb-6">{message}</p>
               <p className="text-sm text-gray-500 mb-4">正在跳轉到登入頁面...</p>
               <Link
-                href="/auth/login"
+                href="/login"
                 className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 立即登入
@@ -168,7 +168,7 @@ function VerifyEmailContent() {
               )}
 
               <Link
-                href="/auth/register"
+                href="/signup"
                 className="inline-block mt-4 text-blue-600 hover:text-blue-800 text-sm"
               >
                 返回註冊頁面
