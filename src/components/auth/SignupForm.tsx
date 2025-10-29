@@ -1,4 +1,4 @@
-// src/components/auth/SignupForm.tsx
+// src/components/auth/SignupForm.tsx - UPDATED
 'use client';
 
 import { useState } from 'react';
@@ -83,18 +83,12 @@ export default function SignupForm() {
         throw new Error(data.error || '註冊失敗');
       }
 
-      console.log('✅ Signup successful:', data); // Debug log
-
-      // Success! Redirect to verification page
+      // ✅ SUCCESS: Redirect to check-email page (not verify-email)
       const emailToVerify = data.data?.email || formData.email;
-      const verifyUrl = '/verify-email?email=' + encodeURIComponent(emailToVerify);
-      console.log('🔄 Redirecting to:', verifyUrl); // Debug log
+      router.push(`/check-email?email=${encodeURIComponent(emailToVerify)}`);
       
-      // Force redirect
-      window.location.href = verifyUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : '註冊時發生錯誤，請稍後再試');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -103,7 +97,7 @@ export default function SignupForm() {
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Error Message */}
       {error && (
-        <div className="rounded-md bg-red-50 p-4">
+        <div className="rounded-md bg-red-50 p-4 border border-red-200">
           <div className="flex">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -133,26 +127,7 @@ export default function SignupForm() {
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
         <p className="mt-1 text-xs text-gray-500">
-          3-30 個字元，只能包含英數字和底線
-        </p>
-      </div>
-
-      {/* Display Name */}
-      <div>
-        <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
-          顯示名稱（選填）
-        </label>
-        <input
-          id="displayName"
-          name="displayName"
-          type="text"
-          value={formData.displayName}
-          onChange={handleChange}
-          placeholder="張小明"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          未填寫時將使用使用者名稱
+          3-30 個字元，只能使用英數字和底線
         </p>
       </div>
 
@@ -173,6 +148,25 @@ export default function SignupForm() {
         />
       </div>
 
+      {/* Display Name (Optional) */}
+      <div>
+        <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
+          顯示名稱 <span className="text-gray-400">(選填)</span>
+        </label>
+        <input
+          id="displayName"
+          name="displayName"
+          type="text"
+          value={formData.displayName}
+          onChange={handleChange}
+          placeholder="您的名字"
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          如果不填寫，將使用使用者名稱作為顯示名稱
+        </p>
+      </div>
+
       {/* Password */}
       <div>
         <label htmlFor="password" className="block text-sm font-medium text-gray-700">
@@ -185,12 +179,9 @@ export default function SignupForm() {
           required
           value={formData.password}
           onChange={handleChange}
-          placeholder="••••••••"
+          placeholder="至少 8 個字元"
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
-        <p className="mt-1 text-xs text-gray-500">
-          至少 8 個字元
-        </p>
       </div>
 
       {/* Confirm Password */}
@@ -205,7 +196,7 @@ export default function SignupForm() {
           required
           value={formData.confirmPassword}
           onChange={handleChange}
-          placeholder="••••••••"
+          placeholder="再次輸入密碼"
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
@@ -214,22 +205,20 @@ export default function SignupForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
-        {isLoading ? '註冊中...' : '建立帳號'}
+        {isLoading ? (
+          <>
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            註冊中...
+          </>
+        ) : (
+          '註冊帳號'
+        )}
       </button>
-
-      {/* Terms */}
-      <p className="text-xs text-center text-gray-500">
-        註冊即表示您同意我們的{' '}
-        <a href="/terms" className="text-blue-600 hover:text-blue-500">
-          服務條款
-        </a>{' '}
-        和{' '}
-        <a href="/privacy" className="text-blue-600 hover:text-blue-500">
-          隱私政策
-        </a>
-      </p>
     </form>
   );
 }

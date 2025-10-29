@@ -1,4 +1,4 @@
-// src/lib/email.ts - FIXED VERSION
+// src/lib/email.ts - CORRECTED VERSION
 import { Resend } from "resend";
 import crypto from "crypto";
 
@@ -27,8 +27,9 @@ export async function sendVerificationEmail(
   username: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // ✅ FIXED: Added /api/ prefix to the path
-    const verificationUrl = `${APP_URL}/api/auth/verify-email?token=${token}`;
+    // ✅ FIXED: Link to the PAGE, not the API endpoint
+    // The page will call the API via JavaScript
+    const verificationUrl = `${APP_URL}/verify-email?token=${token}`;
 
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
@@ -99,7 +100,7 @@ export async function sendPasswordResetEmail(
   username: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const resetUrl = `${APP_URL}/auth/reset-password?token=${token}`;
+    const resetUrl = `${APP_URL}/reset-password?token=${token}`;
 
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
