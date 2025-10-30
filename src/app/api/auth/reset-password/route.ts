@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       { _id: tokenResult.userId },
       {
         $set: {
-          password: hashedPassword,
+          passwordHash: hashedPassword,
           updatedAt: new Date(),
         },
       }
