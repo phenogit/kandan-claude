@@ -42,6 +42,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // NEW: Validate dailyHigh and dailyLow are provided
+    if (!dailyHigh || !dailyLow) {
+      return NextResponse.json(
+        { error: "無法取得今日價格範圍，請稍後再試" },
+        { status: 400 }
+      );
+    }
+
     if (ceiling <= floor) {
       return NextResponse.json(
         { error: "天花板必須高於地板" },
@@ -52,6 +60,36 @@ export async function POST(request: NextRequest) {
     if (ceiling <= startPrice || floor >= startPrice) {
       return NextResponse.json(
         { error: "價格區間必須包含現價" },
+        { status: 400 }
+      );
+    }
+
+    // NEW VALIDATION: ceiling must be above daily high
+    if (ceiling <= dailyHigh) {
+      return NextResponse.json(
+        {
+          error: `天花板價格 ($${ceiling}) 必須高於今日最高價 ($${dailyHigh})`,
+          details: {
+            ceiling,
+            dailyHigh,
+            rule: "ceiling > dailyHigh",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // NEW VALIDATION: floor must be below daily low
+    if (floor >= dailyLow) {
+      return NextResponse.json(
+        {
+          error: `地板價格 ($${floor}) 必須低於今日最低價 ($${dailyLow})`,
+          details: {
+            floor,
+            dailyLow,
+            rule: "floor < dailyLow",
+          },
+        },
         { status: 400 }
       );
     }
