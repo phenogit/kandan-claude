@@ -59,20 +59,21 @@ export async function GET(
     let userInfo: UserInfo | null = null;
 
     if (isLegacy) {
-      // For legacy, try to find migrated user
-      const migratedUser = await newDb
-        .collection("users")
-        .findOne({ legacyUserId: prediction.userId?.toString() });
+      // ✅ FIXED: For legacy predictions, look up legacy user by userName
+      const legacyUser = await legacyDb
+        ?.collection("users")
+        .findOne({ name: prediction.userName });
 
-      if (migratedUser) {
+      if (legacyUser) {
+        // Use legacy user data directly
         userInfo = {
-          username: migratedUser.username,
-          displayName: migratedUser.displayName || migratedUser.username,
-          avatarUrl: migratedUser.avatarUrl || null,
+          username: legacyUser.name,
+          displayName: legacyUser.name,
+          avatarUrl: null,
           isLegacy: true,
         };
       } else {
-        // Create placeholder user info from legacy data
+        // Fallback: use userName from prediction
         userInfo = {
           username: prediction.userName || "legacy_user",
           displayName: prediction.userName || "Legacy User",
