@@ -1,8 +1,10 @@
 // src/components/home/GlobalFeed.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import debounce from 'lodash/debounce';
+import StockAutocomplete from './StockAutocomplete';
 
 type Prediction = {
   _id: string;
@@ -21,17 +23,61 @@ type Prediction = {
   isLegacy: boolean;
 };
 
+type Filters = {
+  ticker: string;
+  status: 'all' | 'pending' | 'resolved';
+  direction: 'all' | 'bull' | 'bear';
+  userType: 'all' | 'legacy' | 'new';
+  timeRange: 'all' | 'today' | 'week' | 'month';
+  sortBy: 'newest' | 'popular' | 'ending-soon';
+};
+
 export default function GlobalFeed() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Filter states
+  const [filters, setFilters] = useState<Filters>({
+    ticker: '',
+    status: 'all',
+    direction: 'all',
+    userType: 'all',
+    timeRange: 'all',
+    sortBy: 'newest',
+  });
+
+  // Debounced ticker search
+  const debouncedSearch = useCallback(
+    debounce((searchTerm: string) => {
+      setFilters(prev => ({ ...prev, ticker: searchTerm }));
+      setPage(1); // Reset to page 1 on search
+    }, 300),
+    []
+  );
 
   useEffect(() => {
     async function fetchPredictions() {
       try {
-        const response = await fetch(`/api/feed/global?page=${page}&limit=10`);
+        setIsLoading(true);
+        
+        // Build query string
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: '10',
+          ...(filters.ticker && { ticker: filters.ticker }),
+          ...(filters.status !== 'all' && { status: filters.status }),
+          ...(filters.direction !== 'all' && { direction: filters.direction }),
+          ...(filters.userType !== 'all' && { userType: filters.userType }),
+          ...(filters.timeRange !== 'all' && { timeRange: filters.timeRange }),
+          sortBy: filters.sortBy,
+        });
+
+        const response = await fetch(`/api/feed/global?${params}`);
         const data = await response.json();
+        
         if (data.success) {
           setPredictions(prev => page === 1 ? data.data : [...prev, ...data.data]);
           setHasMore(data.pagination.hasMore);
@@ -44,7 +90,7 @@ export default function GlobalFeed() {
     }
 
     fetchPredictions();
-  }, [page]);
+  }, [page, filters]);
 
   const loadMore = () => {
     setPage(prev => prev + 1);
@@ -54,17 +100,38 @@ export default function GlobalFeed() {
     try {
       // TODO: Implement follow API call
       console.log('Following prediction:', predictionId);
-      // const response = await fetch('/api/predictions/follow', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ predictionId }),
-      // });
       alert('追蹤功能開發中...');
     } catch (error) {
       console.error('Follow failed:', error);
       alert('追蹤失敗，請稍後再試');
     }
   };
+
+  const updateFilter = (key: keyof Filters, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPage(1); // Reset to page 1 when filter changes
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      ticker: '',
+      status: 'all',
+      direction: 'all',
+      userType: 'all',
+      timeRange: 'all',
+      sortBy: 'newest',
+    });
+    setPage(1);
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = 
+    filters.ticker !== '' ||
+    filters.status !== 'all' ||
+    filters.direction !== 'all' ||
+    filters.userType !== 'all' ||
+    filters.timeRange !== 'all' ||
+    filters.sortBy !== 'newest';
 
   if (isLoading && page === 1) {
     return (
@@ -85,26 +152,275 @@ export default function GlobalFeed() {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">
           全球動態
         </h2>
-        <button className="text-sm text-gray-600 hover:text-gray-900">
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+        >
           🔍 篩選
+          {hasActiveFilters && (
+            <span className="ml-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+              {Object.values(filters).filter(v => v !== 'all' && v !== '' && v !== 'newest').length}
+            </span>
+          )}
         </button>
       </div>
 
+      {/* Filter Panel */}
+      {showFilters && (
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="space-y-4">
+            {/* Stock Ticker Search */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                股票代號
+              </label>
+              <StockAutocomplete
+                value={filters.ticker}
+                onChange={(value) => {
+                  setFilters(prev => ({ ...prev, ticker: value }));
+                  setPage(1);
+                }}
+                placeholder="搜尋股票代號或名稱..."
+              />
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                狀態
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'all', label: '全部' },
+                  { value: 'pending', label: '進行中' },
+                  { value: 'resolved', label: '已結束' },
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => updateFilter('status', option.value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      filters.status === option.value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Direction Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                方向
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'all', label: '全部', icon: '' },
+                  { value: 'bull', label: '看漲', icon: '🐂' },
+                  { value: 'bear', label: '看跌', icon: '🐻' },
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => updateFilter('direction', option.value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      filters.direction === option.value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {option.icon} {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* User Type Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                用戶類型
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'all', label: '全部' },
+                  { value: 'new', label: '新用戶' },
+                  { value: 'legacy', label: 'Legacy' },
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => updateFilter('userType', option.value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      filters.userType === option.value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Time Range Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                時間範圍
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { value: 'all', label: '全部時間' },
+                  { value: 'today', label: '今天' },
+                  { value: 'week', label: '本週' },
+                  { value: 'month', label: '本月' },
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => updateFilter('timeRange', option.value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      filters.timeRange === option.value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sort By */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                排序方式
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { value: 'newest', label: '最新' },
+                  { value: 'popular', label: '最多追蹤' },
+                  { value: 'ending-soon', label: '即將結束' },
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => updateFilter('sortBy', option.value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      filters.sortBy === option.value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 font-medium"
+              >
+                清除所有篩選
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Active Filter Pills */}
+      {hasActiveFilters && !showFilters && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {filters.ticker && (
+            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+              股票: {filters.ticker}
+              <button
+                onClick={() => updateFilter('ticker', '')}
+                className="hover:text-blue-900"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          {filters.status !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+              {filters.status === 'pending' ? '進行中' : '已結束'}
+              <button
+                onClick={() => updateFilter('status', 'all')}
+                className="hover:text-blue-900"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          {filters.direction !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+              {filters.direction === 'bull' ? '🐂 看漲' : '🐻 看跌'}
+              <button
+                onClick={() => updateFilter('direction', 'all')}
+                className="hover:text-blue-900"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          {filters.userType !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+              {filters.userType === 'new' ? '新用戶' : 'Legacy'}
+              <button
+                onClick={() => updateFilter('userType', 'all')}
+                className="hover:text-blue-900"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          {filters.timeRange !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+              {filters.timeRange === 'today' ? '今天' : filters.timeRange === 'week' ? '本週' : '本月'}
+              <button
+                onClick={() => updateFilter('timeRange', 'all')}
+                className="hover:text-blue-900"
+              >
+                ×
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Predictions List */}
       <div className="space-y-4">
-        {predictions.map((pred) => (
-          <PredictionCard
-            key={pred._id}
-            prediction={pred}
-            onFollow={handleFollow}
-          />
-        ))}
+        {predictions.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">沒有找到符合條件的預測</p>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+              >
+                清除篩選
+              </button>
+            )}
+          </div>
+        ) : (
+          predictions.map((pred) => (
+            <PredictionCard
+              key={pred._id}
+              prediction={pred}
+              onFollow={handleFollow}
+            />
+          ))
+        )}
       </div>
 
-      {hasMore && (
+      {/* Load More Button */}
+      {hasMore && predictions.length > 0 && (
         <div className="mt-6 text-center">
           <button
             onClick={loadMore}
@@ -193,7 +509,7 @@ function PredictionCard({ prediction, onFollow }: PredictionCardProps) {
         <div className="mt-3">
           <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
             <span>地板</span>
-            <span className="font-medium text-blue-600">↑ 目前</span>
+            <span className="font-medium text-blue-600">→ 目前</span>
             <span>天花板</span>
           </div>
           
@@ -243,8 +559,6 @@ function PredictionCard({ prediction, onFollow }: PredictionCardProps) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            // This button now just navigates (redundant with card click)
-            // You can either remove it or keep it for explicit action
             window.location.href = `/prediction/${prediction._id}`;
           }}
           className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
