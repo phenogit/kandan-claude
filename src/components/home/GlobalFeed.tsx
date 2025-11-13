@@ -1,27 +1,8 @@
 // src/components/home/GlobalFeed.tsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import debounce from 'lodash/debounce';
-import StockAutocomplete from './StockAutocomplete';
-
-type Prediction = {
-  _id: string;
-  userName: string;
-  ticker: string;
-  tickerName: string;
-  direction: number;
-  ceiling: number;
-  floor: number;
-  startPrice: number;
-  currentPrice: number;
-  confidence: number;
-  status: string;
-  profitRate?: number;
-  createdAt: string;
-  isLegacy: boolean;
-};
+import { useState, useEffect } from 'react';
+import PredictionCard from '@/components/home/PredictionCard';
 
 type Filters = {
   ticker: string;
@@ -32,14 +13,30 @@ type Filters = {
   sortBy: 'newest' | 'popular' | 'ending-soon';
 };
 
+type Prediction = {
+  _id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string | null;
+  ticker: string;
+  stockName: string;
+  direction: 'bull' | 'bear' | 1 | -1;  // Accept both string and number formats
+  currentPrice: number;
+  floor: number;
+  ceiling: number;
+  confidence?: number;
+  followCount: number;
+  status: 'pending' | 'resolved';
+  createdAt: string;
+  isLegacy: boolean;
+};
+
 export default function GlobalFeed() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [cursor, setCursor] = useState<string | null>(null); // Changed from page to cursor
   const [hasMore, setHasMore] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  
-  // Filter states
   const [filters, setFilters] = useState<Filters>({
     ticker: '',
     status: 'all',
@@ -48,38 +45,65 @@ export default function GlobalFeed() {
     timeRange: 'all',
     sortBy: 'newest',
   });
+  
+  // Debounced ticker value - initialize with same value as filters.ticker
+  const [debouncedTicker, setDebouncedTicker] = useState(filters.ticker);
 
-  // Debounced ticker search
-  const debouncedSearch = useCallback(
-    debounce((searchTerm: string) => {
-      setFilters(prev => ({ ...prev, ticker: searchTerm }));
-      setPage(1); // Reset to page 1 on search
-    }, 300),
-    []
-  );
+  // Debounce ticker input (wait 500ms after user stops typing)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTicker(filters.ticker);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [filters.ticker]);
+
+  // Reset cursor and predictions when debouncedTicker changes (after debounce completes)
+  useEffect(() => {
+    // Don't reset on initial mount (when both are empty)
+    if (debouncedTicker === '' && filters.ticker === '') {
+      return;
+    }
+    
+    if (debouncedTicker !== filters.ticker) {
+      // Still debouncing, don't reset yet
+      return;
+    }
+    
+    // Debounce complete, reset for new search
+    setCursor(null);
+    setPredictions([]);
+  }, [debouncedTicker]);
 
   useEffect(() => {
     async function fetchPredictions() {
+      setIsLoading(true);
       try {
-        setIsLoading(true);
-        
         // Build query string
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: '10',
-          ...(filters.ticker && { ticker: filters.ticker }),
-          ...(filters.status !== 'all' && { status: filters.status }),
-          ...(filters.direction !== 'all' && { direction: filters.direction }),
-          ...(filters.userType !== 'all' && { userType: filters.userType }),
-          ...(filters.timeRange !== 'all' && { timeRange: filters.timeRange }),
-          sortBy: filters.sortBy,
-        });
+        const params = new URLSearchParams();
+        
+        // Add cursor if it exists (for subsequent pages)
+        if (cursor) {
+          params.append('cursor', cursor);
+        }
+        
+        params.append('limit', '20');
+        
+        // Add filters (use debouncedTicker instead of filters.ticker)
+        if (debouncedTicker) params.append('ticker', debouncedTicker);
+        if (filters.status !== 'all') params.append('status', filters.status);
+        if (filters.direction !== 'all') params.append('direction', filters.direction);
+        if (filters.userType !== 'all') params.append('userType', filters.userType);
+        if (filters.timeRange !== 'all') params.append('timeRange', filters.timeRange);
+        if (filters.sortBy !== 'newest') params.append('sortBy', filters.sortBy);
 
-        const response = await fetch(`/api/feed/global?${params}`);
+        const response = await fetch(`/api/feed/global?${params.toString()}`);
         const data = await response.json();
         
         if (data.success) {
-          setPredictions(prev => page === 1 ? data.data : [...prev, ...data.data]);
+          // If cursor is null, this is the first page - replace data
+          // Otherwise, append to existing data
+          setPredictions(prev => cursor === null ? data.data : [...prev, ...data.data]);
           setHasMore(data.pagination.hasMore);
         }
       } catch (error) {
@@ -90,10 +114,14 @@ export default function GlobalFeed() {
     }
 
     fetchPredictions();
-  }, [page, filters]);
+  }, [cursor, debouncedTicker, filters.status, filters.direction, filters.userType, filters.timeRange, filters.sortBy]);
 
   const loadMore = () => {
-    setPage(prev => prev + 1);
+    if (predictions.length > 0) {
+      // Set cursor to the timestamp of the last prediction
+      const lastPrediction = predictions[predictions.length - 1];
+      setCursor(lastPrediction.createdAt);
+    }
   };
 
   const handleFollow = async (predictionId: string) => {
@@ -109,7 +137,13 @@ export default function GlobalFeed() {
 
   const updateFilter = (key: keyof Filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
-    setPage(1); // Reset to page 1 when filter changes
+    
+    // Only reset cursor and predictions for non-ticker filters
+    // Ticker filter uses debouncing, so it handles its own reset
+    if (key !== 'ticker') {
+      setCursor(null);
+      setPredictions([]);
+    }
   };
 
   const clearFilters = () => {
@@ -121,19 +155,20 @@ export default function GlobalFeed() {
       timeRange: 'all',
       sortBy: 'newest',
     });
-    setPage(1);
+    setCursor(null); // Reset cursor
+    setPredictions([]); // Clear existing predictions
   };
 
   // Check if any filters are active
   const hasActiveFilters = 
-    filters.ticker !== '' ||
+    debouncedTicker !== '' ||
     filters.status !== 'all' ||
     filters.direction !== 'all' ||
     filters.userType !== 'all' ||
     filters.timeRange !== 'all' ||
     filters.sortBy !== 'newest';
 
-  if (isLoading && page === 1) {
+  if (isLoading && cursor === null) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -173,251 +208,152 @@ export default function GlobalFeed() {
       {/* Filter Panel */}
       {showFilters && (
         <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="space-y-4">
-            {/* Stock Ticker Search */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Ticker Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 股票代號
               </label>
-              <StockAutocomplete
-                value={filters.ticker}
-                onChange={(value) => {
-                  setFilters(prev => ({ ...prev, ticker: value }));
-                  setPage(1);
-                }}
-                placeholder="搜尋股票代號或名稱..."
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="例如: 2330"
+                  value={filters.ticker}
+                  onChange={(e) => updateFilter('ticker', e.target.value.toUpperCase())}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {filters.ticker !== debouncedTicker && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+              {filters.ticker && filters.ticker !== debouncedTicker && (
+                <p className="text-xs text-gray-500 mt-1">正在搜尋...</p>
+              )}
             </div>
 
             {/* Status Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 狀態
               </label>
-              <div className="flex gap-2">
-                {[
-                  { value: 'all', label: '全部' },
-                  { value: 'pending', label: '進行中' },
-                  { value: 'resolved', label: '已結束' },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => updateFilter('status', option.value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      filters.status === option.value
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              <select
+                value={filters.status}
+                onChange={(e) => updateFilter('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">全部</option>
+                <option value="pending">進行中</option>
+                <option value="resolved">已結算</option>
+              </select>
             </div>
 
             {/* Direction Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 方向
               </label>
-              <div className="flex gap-2">
-                {[
-                  { value: 'all', label: '全部', icon: '' },
-                  { value: 'bull', label: '看漲', icon: '🐂' },
-                  { value: 'bear', label: '看跌', icon: '🐻' },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => updateFilter('direction', option.value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      filters.direction === option.value
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {option.icon} {option.label}
-                  </button>
-                ))}
-              </div>
+              <select
+                value={filters.direction}
+                onChange={(e) => updateFilter('direction', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">全部</option>
+                <option value="bull">看漲 🐂</option>
+                <option value="bear">看跌 🐻</option>
+              </select>
             </div>
 
             {/* User Type Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 用戶類型
               </label>
-              <div className="flex gap-2">
-                {[
-                  { value: 'all', label: '全部' },
-                  { value: 'new', label: '新用戶' },
-                  { value: 'legacy', label: 'Legacy' },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => updateFilter('userType', option.value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      filters.userType === option.value
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              <select
+                value={filters.userType}
+                onChange={(e) => updateFilter('userType', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">全部</option>
+                <option value="new">新版用戶</option>
+                <option value="legacy">舊版用戶</option>
+              </select>
             </div>
 
             {/* Time Range Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 時間範圍
               </label>
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  { value: 'all', label: '全部時間' },
-                  { value: 'today', label: '今天' },
-                  { value: 'week', label: '本週' },
-                  { value: 'month', label: '本月' },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => updateFilter('timeRange', option.value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      filters.timeRange === option.value
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              <select
+                value={filters.timeRange}
+                onChange={(e) => updateFilter('timeRange', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">全部</option>
+                <option value="today">今天</option>
+                <option value="week">本週</option>
+                <option value="month">本月</option>
+              </select>
             </div>
 
-            {/* Sort By */}
+            {/* Sort By Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 排序方式
               </label>
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  { value: 'newest', label: '最新' },
-                  { value: 'popular', label: '最多追蹤' },
-                  { value: 'ending-soon', label: '即將結束' },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => updateFilter('sortBy', option.value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      filters.sortBy === option.value
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              <select
+                value={filters.sortBy}
+                onChange={(e) => updateFilter('sortBy', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="newest">最新</option>
+                <option value="popular">最熱門</option>
+                <option value="ending-soon">即將結算</option>
+              </select>
             </div>
+          </div>
 
-            {/* Clear Filters */}
-            {hasActiveFilters && (
+          {/* Clear Filters Button */}
+          {hasActiveFilters && (
+            <div className="mt-4">
               <button
                 onClick={clearFilters}
-                className="w-full px-4 py-2 text-sm text-gray-700 hover:text-gray-900 font-medium"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
                 清除所有篩選
               </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Active Filter Pills */}
-      {hasActiveFilters && !showFilters && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {filters.ticker && (
-            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-              股票: {filters.ticker}
-              <button
-                onClick={() => updateFilter('ticker', '')}
-                className="hover:text-blue-900"
-              >
-                ×
-              </button>
-            </span>
-          )}
-          {filters.status !== 'all' && (
-            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-              {filters.status === 'pending' ? '進行中' : '已結束'}
-              <button
-                onClick={() => updateFilter('status', 'all')}
-                className="hover:text-blue-900"
-              >
-                ×
-              </button>
-            </span>
-          )}
-          {filters.direction !== 'all' && (
-            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-              {filters.direction === 'bull' ? '🐂 看漲' : '🐻 看跌'}
-              <button
-                onClick={() => updateFilter('direction', 'all')}
-                className="hover:text-blue-900"
-              >
-                ×
-              </button>
-            </span>
-          )}
-          {filters.userType !== 'all' && (
-            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-              {filters.userType === 'new' ? '新用戶' : 'Legacy'}
-              <button
-                onClick={() => updateFilter('userType', 'all')}
-                className="hover:text-blue-900"
-              >
-                ×
-              </button>
-            </span>
-          )}
-          {filters.timeRange !== 'all' && (
-            <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-              {filters.timeRange === 'today' ? '今天' : filters.timeRange === 'week' ? '本週' : '本月'}
-              <button
-                onClick={() => updateFilter('timeRange', 'all')}
-                className="hover:text-blue-900"
-              >
-                ×
-              </button>
-            </span>
+            </div>
           )}
         </div>
       )}
 
       {/* Predictions List */}
       <div className="space-y-4">
-        {predictions.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">沒有找到符合條件的預測</p>
-            {hasActiveFilters && (
-              <button
-                onClick={clearFilters}
-                className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
-              >
-                清除篩選
-              </button>
-            )}
-          </div>
-        ) : (
-          predictions.map((pred) => (
-            <PredictionCard
-              key={pred._id}
-              prediction={pred}
-              onFollow={handleFollow}
-            />
-          ))
-        )}
+        {predictions.map((pred) => (
+          <PredictionCard
+            key={pred._id}
+            prediction={pred}
+            onFollow={handleFollow}
+          />
+        ))}
       </div>
+
+      {/* Empty State */}
+      {!isLoading && predictions.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-500">找不到符合條件的預測</p>
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
+              清除篩選條件
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Load More Button */}
       {hasMore && predictions.length > 0 && (
@@ -432,153 +368,5 @@ export default function GlobalFeed() {
         </div>
       )}
     </div>
-  );
-}
-
-// Separate PredictionCard component for better organization
-interface PredictionCardProps {
-  prediction: Prediction;
-  onFollow: (predictionId: string) => void;
-}
-
-function PredictionCard({ prediction, onFollow }: PredictionCardProps) {
-  // Calculate price position for the visual indicator
-  const priceProgress = 
-    ((prediction.currentPrice - prediction.floor) / 
-     (prediction.ceiling - prediction.floor)) * 100;
-  
-  // Clamp between 0 and 100
-  const clampedProgress = Math.min(Math.max(priceProgress, 0), 100);
-  
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffHours < 1) return '剛剛';
-    if (diffHours < 24) return `${diffHours} 小時前`;
-    if (diffDays < 7) return `${diffDays} 天前`;
-    return date.toLocaleDateString('zh-TW');
-  };
-
-  return (
-    <Link 
-      href={`/prediction/${prediction._id}`}
-      className="block border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-    >
-      {/* User Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-            <span className="text-xs font-semibold text-gray-600">
-              {prediction.userName.substring(0, 2).toUpperCase()}
-            </span>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-900">
-              @{prediction.userName}
-            </p>
-          </div>
-          {prediction.isLegacy && (
-            <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
-              Legacy
-            </span>
-          )}
-        </div>
-        <span className="text-xs text-gray-500">
-          {formatDate(prediction.createdAt)}
-        </span>
-      </div>
-
-      {/* Prediction Content */}
-      <div className="mb-4">
-        {/* Stock Info */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-2xl">
-            {prediction.direction === 1 ? '🐂' : '🐻'}
-          </span>
-          <h3 className="text-lg font-bold text-gray-900">
-            {prediction.ticker} {prediction.tickerName}
-          </h3>
-        </div>
-
-        {/* Visual Price Indicator */}
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-            <span>地板</span>
-            <span className="font-medium text-blue-600">→ 目前</span>
-            <span>天花板</span>
-          </div>
-          
-          {/* Progress Bar */}
-          <div className="relative h-2 bg-gray-200 rounded-full mb-1">
-            <div 
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-600 rounded-full border-2 border-white shadow-md transition-all"
-              style={{ left: `${clampedProgress}%` }}
-            />
-          </div>
-          
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-900">${prediction.floor}</span>
-            <span className="font-bold text-blue-600">${prediction.currentPrice}</span>
-            <span className="text-gray-900">${prediction.ceiling}</span>
-          </div>
-          
-          <div className="text-xs text-gray-500 mt-1">
-            起始: ${prediction.startPrice}
-          </div>
-        </div>
-
-        {/* Status Badge */}
-        <div className="mt-3">
-          <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-            prediction.status === 'pending' 
-              ? 'bg-orange-100 text-orange-700' 
-              : prediction.status.includes('success')
-              ? 'bg-green-100 text-green-700'
-              : 'bg-red-100 text-red-700'
-          }`}>
-            {prediction.status === 'pending' ? '進行中' : 
-             prediction.status.includes('success') ? '成功' : '失敗'}
-          </span>
-        </div>
-      </div>
-
-      {/* Action Buttons - Prevent link navigation */}
-      <div 
-        className="flex gap-2"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-      >
-        <button 
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            window.location.href = `/prediction/${prediction._id}`;
-          }}
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
-        >
-          👁️ 查看詳情
-        </button>
-        
-        {prediction.status === 'pending' && (
-          <button 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onFollow(prediction._id);
-            }}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            追蹤
-          </button>
-        )}
-      </div>
-    </Link>
   );
 }

@@ -1,0 +1,207 @@
+// src/app/api/feed/global/route.ts
+// FIXED VERSION - Solves pagination issue
+
+import { NextRequest, NextResponse } from "next/server";
+import { connectDatabases } from "@/lib/mongodb";
+import { legacyPredictions, mapLegacyPrediction } from "@/lib/legacyDb";
+
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+
+    // Filter parameters
+    const ticker = searchParams.get("ticker")?.toUpperCase() || null;
+    const status = searchParams.get("status") || "all";
+    const direction = searchParams.get("direction") || "all";
+    const userType = searchParams.get("userType") || "all";
+    const timeRange = searchParams.get("timeRange") || "all";
+    const sortBy = searchParams.get("sortBy") || "newest";
+
+    const { newDb } = await connectDatabases();
+
+    // ===== BUILD TIME RANGE FILTER =====
+    let dateFilter: Date | null = null;
+    if (timeRange === "today") {
+      dateFilter = new Date();
+      dateFilter.setHours(0, 0, 0, 0);
+    } else if (timeRange === "week") {
+      dateFilter = new Date();
+      dateFilter.setDate(dateFilter.getDate() - 7);
+    } else if (timeRange === "month") {
+      dateFilter = new Date();
+      dateFilter.setMonth(dateFilter.getMonth() - 1);
+    }
+
+    // ===== BUILD QUERIES =====
+    const newQuery: any = { isPublic: true };
+    const legacyQuery: any = {};
+
+    if (ticker) {
+      newQuery.ticker = { $regex: ticker, $options: "i" };
+      legacyQuery.stockId = { $regex: ticker, $options: "i" };
+    }
+
+    if (status === "pending") {
+      newQuery.status = "pending";
+      legacyQuery.isCompleted = false;
+    } else if (status === "resolved") {
+      newQuery.status = { $ne: "pending" };
+      legacyQuery.isCompleted = true;
+    }
+
+    if (direction === "bull") {
+      newQuery.direction = 1;
+      legacyQuery.bearOrBull = 1;
+    } else if (direction === "bear") {
+      newQuery.direction = -1;
+      legacyQuery.bearOrBull = -1;
+    }
+
+    if (dateFilter) {
+      newQuery.createdAt = { $gte: dateFilter };
+      legacyQuery.startTime = { $gte: dateFilter };
+    }
+
+    // ===== COUNT TOTALS (for accurate pagination) =====
+    let newTotal = 0;
+    let legacyTotal = 0;
+
+    if (userType !== "legacy") {
+      newTotal = await newDb.collection("predictions").countDocuments(newQuery);
+    }
+
+    if (userType !== "new") {
+      legacyTotal = await legacyPredictions.countDocuments(legacyQuery);
+    }
+
+    const totalCount = newTotal + legacyTotal;
+
+    // ===== FETCH PREDICTIONS =====
+    // Strategy: Fetch enough to cover the current page after merging
+    // We'll fetch more than needed and slice after sorting
+    const fetchLimit = Math.min(limit * 5, 100); // Fetch 5x limit or max 100
+
+    let newPredictions: any[] = [];
+    let legacyPreds: any[] = [];
+
+    if (userType !== "legacy") {
+      newPredictions = await newDb
+        .collection("predictions")
+        .find(newQuery)
+        .sort({ createdAt: -1 })
+        .limit(fetchLimit)
+        .toArray();
+
+      // Enrich with user data
+      const userIds = [...new Set(newPredictions.map((p: any) => p.userId))];
+      const users = await newDb
+        .collection("users")
+        .find({ _id: { $in: userIds } })
+        .toArray();
+
+      const userMap = new Map(users.map((u: any) => [u._id.toString(), u]));
+
+      newPredictions = newPredictions.map((pred: any) => {
+        const user = userMap.get(pred.userId.toString());
+        return {
+          _id: pred._id.toString(),
+          userName: user?.username || "Unknown",
+          ticker: pred.ticker,
+          tickerName: pred.tickerName,
+          direction: pred.direction,
+          ceiling: pred.ceiling,
+          floor: pred.floor,
+          startPrice: pred.startPrice,
+          currentPrice: pred.currentPrice || pred.startPrice,
+          confidence: pred.confidence,
+          status: pred.status,
+          profitRate: pred.profitRate,
+          followCount: pred.followCount || 0,
+          isLegacy: false,
+          createdAt: pred.createdAt.toISOString(),
+          rationale: pred.rationale || null,
+        };
+      });
+    }
+
+    if (userType !== "new") {
+      legacyPreds = await legacyPredictions.find(legacyQuery, {
+        sort: { startTime: -1 },
+        limit: fetchLimit,
+      });
+
+      legacyPreds = legacyPreds.map((pred: any) => ({
+        ...mapLegacyPrediction(pred),
+        followCount: pred.followers?.length || 0,
+      }));
+    }
+
+    // ===== MERGE AND SORT =====
+    let allPredictions = [...newPredictions, ...legacyPreds];
+
+    if (sortBy === "newest") {
+      allPredictions.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+    } else if (sortBy === "popular") {
+      allPredictions.sort((a, b) => {
+        if (b.followCount !== a.followCount) {
+          return b.followCount - a.followCount;
+        }
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+    } else if (sortBy === "ending-soon") {
+      allPredictions = allPredictions
+        .filter((p) => p.status === "pending")
+        .sort((a, b) => {
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          return dateA - dateB;
+        });
+    }
+
+    // ===== PAGINATE =====
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+    const paginatedPredictions = allPredictions.slice(startIndex, endIndex);
+
+    // ===== CALCULATE hasMore =====
+    // Use the actual total count from database, not the fetched array length
+    const hasMore = endIndex < totalCount;
+
+    return NextResponse.json({
+      success: true,
+      data: paginatedPredictions,
+      pagination: {
+        page,
+        limit,
+        total: totalCount, // ✅ Use actual DB count
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore, // ✅ Based on actual total
+      },
+      filters: {
+        ticker: ticker || null,
+        status,
+        direction,
+        userType,
+        timeRange,
+        sortBy,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching global feed:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch global feed",
+      },
+      { status: 500 }
+    );
+  }
+}

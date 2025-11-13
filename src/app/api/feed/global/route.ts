@@ -2,11 +2,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDatabases } from "@/lib/mongodb";
 import { legacyPredictions, mapLegacyPrediction } from "@/lib/legacyDb";
+import { ObjectId } from "mongodb";
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get("page") || "1");
+
+    // Cursor-based pagination: use timestamp instead of page number
+    const cursorParam = searchParams.get("cursor");
+    const cursor = cursorParam ? new Date(cursorParam) : new Date(); // Default to current time for first page
     const limit = parseInt(searchParams.get("limit") || "20");
 
     // Filter parameters
@@ -32,11 +36,14 @@ export async function GET(request: NextRequest) {
       dateFilter.setMonth(dateFilter.getMonth() - 1);
     }
 
-    // ===== FETCH NEW PREDICTIONS =====
+    // ===== FETCH NEW PREDICTIONS (with cursor) =====
     let newPredictions: any[] = [];
 
     if (userType !== "legacy") {
-      const newQuery: any = { isPublic: true };
+      const newQuery: any = {
+        isPublic: true,
+        createdAt: { $lt: cursor }, // CURSOR: Fetch items older than cursor
+      };
 
       // Ticker filter
       if (ticker) {
@@ -47,19 +54,22 @@ export async function GET(request: NextRequest) {
       if (status === "pending") {
         newQuery.status = "pending";
       } else if (status === "resolved") {
-        newQuery.status = { $ne: "pending" };
+        newQuery.status = "resolved";
       }
 
       // Direction filter
       if (direction === "bull") {
-        newQuery.direction = 1;
+        newQuery.direction = 1; // Bull = 1 (number, not string)
       } else if (direction === "bear") {
-        newQuery.direction = -1;
+        newQuery.direction = -1; // Bear = -1 (number, not string)
       }
 
-      // Time range filter
+      // Time range filter (combine with cursor)
       if (dateFilter) {
-        newQuery.createdAt = { $gte: dateFilter };
+        newQuery.createdAt = {
+          $lt: cursor,
+          $gte: dateFilter,
+        };
       }
 
       // Sorting
@@ -68,42 +78,58 @@ export async function GET(request: NextRequest) {
       if (sortBy === "popular") {
         sortOption = { followCount: -1, createdAt: -1 };
       } else if (sortBy === "ending-soon") {
-        // For ending soon, we want pending predictions sorted by how close they are to target
-        sortOption = { status: 1, createdAt: 1 }; // Oldest pending first
+        // For ending-soon, only show pending and sort by oldest first
+        newQuery.status = "pending";
+        sortOption = { createdAt: 1 };
       }
 
-      newPredictions = await newDb
+      const preds = await newDb
         .collection("predictions")
         .find(newQuery)
         .sort(sortOption)
-        .limit(limit * 2)
+        .limit(limit) // Fetch exactly limit items from new DB
         .toArray();
 
-      // Enrich with user data
-      const userIds = [...new Set(newPredictions.map((p: any) => p.userId))];
+      // Get unique user IDs from predictions
+      const userIds = [...new Set(preds.map((p) => p.userId).filter(Boolean))];
+
+      // Convert to ObjectId for MongoDB query, filtering out nulls
+      const userObjectIds = userIds
+        .map((id) => {
+          try {
+            return new ObjectId(id);
+          } catch {
+            return null;
+          }
+        })
+        .filter((id): id is ObjectId => id !== null); // Type guard to remove nulls
+
+      // Fetch user details for all users at once (batch lookup)
       const users = await newDb
         .collection("users")
-        .find({ _id: { $in: userIds } })
+        .find({ _id: { $in: userObjectIds } })
         .toArray();
 
-      const userMap = new Map(users.map((u: any) => [u._id.toString(), u]));
+      // Create a map for quick user lookup
+      const userMap = new Map(users.map((u) => [u._id.toString(), u]));
 
-      newPredictions = newPredictions.map((pred: any) => {
-        const user = userMap.get(pred.userId.toString());
+      newPredictions = preds.map((pred: any) => {
+        const user = userMap.get(pred.userId?.toString());
+
         return {
           _id: pred._id.toString(),
-          userName: user?.username || "Unknown",
-          ticker: pred.ticker,
-          tickerName: pred.tickerName,
+          userId: pred.userId?.toString() || "unknown",
+          userName: user?.username || user?.displayName || "Anonymous",
+          userAvatar: user?.avatar || user?.profileImage || null,
+          ticker: pred.ticker || "N/A",
+          stockName: pred.stockName || pred.ticker || "Unknown Stock",
           direction: pred.direction,
-          ceiling: pred.ceiling,
-          floor: pred.floor,
-          startPrice: pred.startPrice,
-          currentPrice: pred.currentPrice || pred.startPrice,
+          currentPrice: pred.currentPrice || 0,
+          floor: pred.floor || 0,
+          ceiling: pred.ceiling || 0,
           confidence: pred.confidence,
-          status: pred.status,
-          profitRate: pred.profitRate,
           followCount: pred.followCount || 0,
+          status: pred.status,
           isLegacy: false,
           createdAt: pred.createdAt.toISOString(),
           rationale: pred.rationale || null,
@@ -111,11 +137,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ===== FETCH LEGACY PREDICTIONS =====
+    // ===== FETCH LEGACY PREDICTIONS (with cursor) =====
     let legacyPreds: any[] = [];
 
     if (userType !== "new") {
-      const legacyQuery: any = {};
+      const legacyQuery: any = {
+        startTime: { $lt: cursor }, // CURSOR: Fetch items older than cursor
+      };
 
       // Ticker filter
       if (ticker) {
@@ -136,24 +164,27 @@ export async function GET(request: NextRequest) {
         legacyQuery.bearOrBull = -1;
       }
 
-      // Time range filter
+      // Time range filter (combine with cursor)
       if (dateFilter) {
-        legacyQuery.startTime = { $gte: dateFilter };
+        legacyQuery.startTime = {
+          $lt: cursor,
+          $gte: dateFilter,
+        };
       }
 
       // Sorting
       let legacySortOption: any = { startTime: -1 }; // Default: newest first
 
       if (sortBy === "popular") {
-        // Sort by followers array length (legacy has followers array)
         legacySortOption = { followers: -1, startTime: -1 };
       } else if (sortBy === "ending-soon") {
-        legacySortOption = { isCompleted: 1, startTime: 1 }; // Oldest pending first
+        legacyQuery.isCompleted = false; // Only pending
+        legacySortOption = { startTime: 1 }; // Oldest first
       }
 
       legacyPreds = await legacyPredictions.find(legacyQuery, {
         sort: legacySortOption,
-        limit: limit * 2,
+        limit: limit, // Fetch exactly limit items from legacy DB
       });
 
       legacyPreds = legacyPreds.map((pred: any) => ({
@@ -162,7 +193,7 @@ export async function GET(request: NextRequest) {
       }));
     }
 
-    // ===== MERGE AND SORT =====
+    // ===== MERGE AND SORT (merge-sort algorithm) =====
     let allPredictions = [...newPredictions, ...legacyPreds];
 
     // Sort combined results based on sortBy
@@ -183,33 +214,34 @@ export async function GET(request: NextRequest) {
         return dateB - dateA;
       });
     } else if (sortBy === "ending-soon") {
-      // Filter only pending, then sort by creation date (oldest first = closest to ending)
-      allPredictions = allPredictions
-        .filter((p) => p.status === "pending")
-        .sort((a, b) => {
-          const dateA = new Date(a.createdAt).getTime();
-          const dateB = new Date(b.createdAt).getTime();
-          return dateA - dateB; // Oldest first
-        });
+      // Already filtered to pending only, sort by oldest first
+      allPredictions.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateA - dateB; // Oldest first
+      });
     }
 
-    // Paginate after merge
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-    const paginatedPredictions = allPredictions.slice(startIndex, endIndex);
+    // Take only the first `limit` items after merging
+    const paginatedPredictions = allPredictions.slice(0, limit);
 
-    // Calculate total (approximate for performance)
-    const total = allPredictions.length; // This is approximate based on current filters
-    const hasMore = endIndex < total;
+    // Calculate next cursor (timestamp of the last item)
+    const nextCursor =
+      paginatedPredictions.length > 0
+        ? paginatedPredictions[paginatedPredictions.length - 1].createdAt
+        : null;
+
+    // Determine if there are more results
+    // If we got fewer than limit items, there's definitely no more
+    // If we got exactly limit items, there might be more (we don't know for sure)
+    const hasMore = paginatedPredictions.length === limit;
 
     return NextResponse.json({
       success: true,
       data: paginatedPredictions,
       pagination: {
-        page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        nextCursor, // Return cursor instead of page number
         hasMore,
       },
       filters: {
