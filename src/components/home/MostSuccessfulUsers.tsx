@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import UserCurrentPredictions from './UserCurrentPredictions';
 
 type User = {
   _id: string;
@@ -149,53 +150,61 @@ export default function MostSuccessfulUsers() {
 
       <div className="space-y-3">
         {users.map((user, index) => (
-          <div
-            key={user._id}
-            className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition"
-          >
-            {/* Rank */}
-            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
-              {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : 
-                <span className="text-sm font-semibold text-gray-500">{index + 1}</span>
-              }
-            </div>
-
-            {/* Avatar */}
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold text-sm">
-                  {user.displayName.substring(0, 2).toUpperCase()}
-                </span>
+          <div key={user._id} className="rounded-lg hover:bg-gray-50 transition">
+            {/* User Card */}
+            <div className="flex items-center gap-4 p-3 cursor-pointer">
+              {/* Rank */}
+              <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+                {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : 
+                  <span className="text-sm font-semibold text-gray-500">{index + 1}</span>
+                }
               </div>
-            </div>
 
-            {/* User Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-gray-900 truncate">
-                  @{user.username}
-                </p>
-                {user.isLegacy && (
-                  <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
-                    Legacy
+              {/* Avatar */}
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white font-semibold text-sm">
+                    {user.displayName.substring(0, 2).toUpperCase()}
                   </span>
-                )}
+                </div>
               </div>
-              <p className="text-xs text-gray-500">
-                {user.weekStats.accuracyRate}% 準確 · 本週 {user.weekStats.successful}/{user.weekStats.resolved} 成功
-              </p>
-            </div>
 
-            {/* Stats */}
-            <div className="flex-shrink-0 text-right">
-              <p className={`text-sm font-semibold ${
-                user.weekStats.avgProfit >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {user.weekStats.avgProfit >= 0 ? '+' : ''}{user.weekStats.avgProfit.toFixed(2)}%
-              </p>
-              <p className="text-xs text-gray-500">
-                平均報酬
-              </p>
+              {/* User Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    @{user.username}
+                  </p>
+                  {user.isLegacy && (
+                    <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+                      Legacy
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  {user.weekStats.accuracyRate}% 準確 · 本週 {user.weekStats.successful}/{user.weekStats.resolved} 成功
+                </p>
+              </div>
+
+              {/* Stats */}
+              <div className="flex-shrink-0 text-right">
+                <p className={`text-sm font-semibold ${
+                  user.weekStats.avgProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {user.weekStats.avgProfit >= 0 ? '+' : ''}{user.weekStats.avgProfit.toFixed(2)}%
+                </p>
+                <p className="text-xs text-gray-500">
+                  平均報酬
+                </p>
+              </div>
+            </div>
+            
+            {/* Current Predictions - NEW SECTION */}
+            <div className="mt-3 pl-12 pr-3 pb-3">
+              <UserCurrentPredictions
+                username={user.username}
+                limit={typeof window !== 'undefined' && window.innerWidth < 640 ? 2 : 3}
+              />
             </div>
           </div>
         ))}
